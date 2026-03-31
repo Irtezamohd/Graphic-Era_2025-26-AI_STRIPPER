@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Voice Detector</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: white;
+}
+</style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen">
+
+<div class="bg-gray-900 p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+
+    <h1 class="text-2xl font-bold mb-6">🎙 AI Voice Detector</h1>
+
+    <!-- Upload Form -->
+    <form id="uploadForm">
+        <input 
+            type="file" 
+            id="audioFile" 
+            accept="audio/*" 
+            class="mb-4 w-full text-sm"
+            required
+        >
+
+        <button 
+            type="submit"
+            class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-lg font-semibold"
+        >
+            Analyze Voice
+        </button>
+    </form>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden mt-4 text-indigo-400">
+        ⏳ Processing...
+    </div>
+
+    <!-- Result -->
+    <div id="result" class="hidden mt-6">
+        <h2 id="predictionText" class="text-xl font-bold"></h2>
+        <p class="mt-2">
+            Confidence: <span id="confidenceScore"></span>
+        </p>
+
+        <!-- Confidence Bar -->
+        <div class="w-full bg-gray-700 h-2 rounded mt-3">
+            <div id="confidenceBar" class="h-2 bg-green-500 rounded"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const form = document.getElementById("uploadForm");
+const fileInput = document.getElementById("audioFile");
+
+const loading = document.getElementById("loading");
+const resultDiv = document.getElementById("result");
+
+form.addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert("Upload file first");
+        return;
+    }
+
+    // File validation
+    if (!file.type.startsWith("audio/")) {
+        alert("Invalid file type");
+        return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+        alert("File too large (Max 10MB)");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("audio", file);
+
+    // UI reset
+    loading.classList.remove("hidden");
+    resultDiv.classList.add("hidden");
+
+    try {
+        const response = await fetch("/predict", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error("Server error");
+        }
+
+        const text = await response.text();
+
+        if (!text) {
+            throw new Error("Empty response from server");
+        }
+
+        const data = JSON.parse(text);
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Show result
+        loading.classList.add("hidden");
+        resultDiv.classList.remove("hidden");
+
+        const isReal = data.prediction === "Real";
+
+        document.getElementById("predictionText").innerText =
+            isReal ? "🟢 REAL VOICE" : "🔴 FAKE VOICE";
+
+        document.getElementById("confidenceScore").innerText =
+            (data.confidence * 100).toFixed(2) + "%";
+
+        const bar = document.getElementById("confidenceBar");
+        bar.style.width = (data.confidence * 100) + "%";
+
+        if (isReal) {
+            bar.classList.remove("bg-red-500");
+            bar.classList.add("bg-green-500");
+        } else {
+            bar.classList.remove("bg-green-500");
+            bar.classList.add("bg-red-500");
+        }
+
+    } catch (err) {
+        loading.classList.add("hidden");
+        resultDiv.classList.remove("hidden");
+
+        resultDiv.innerHTML = `<span style="color:red;">⚠ ${err.message}</span>`;
+    }
+});
+</script>
+
+</body>
+</html>
