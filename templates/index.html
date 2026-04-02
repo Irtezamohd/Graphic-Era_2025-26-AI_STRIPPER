@@ -47,13 +47,17 @@ body {
     <!-- Result -->
     <div id="result" class="hidden mt-6">
         <h2 id="predictionText" class="text-xl font-bold"></h2>
+
         <p class="mt-2">
             Confidence: <span id="confidenceScore"></span>
         </p>
 
+        <!-- Fake Type -->
+        <p id="fakeTypeText" class="mt-2 text-yellow-400 font-semibold"></p>
+
         <!-- Confidence Bar -->
         <div class="w-full bg-gray-700 h-2 rounded mt-3">
-            <div id="confidenceBar" class="h-2 bg-green-500 rounded"></div>
+            <div id="confidenceBar" class="h-2 rounded"></div>
         </div>
     </div>
 
@@ -76,7 +80,6 @@ form.addEventListener("submit", async function(e) {
         return;
     }
 
-    // File validation
     if (!file.type.startsWith("audio/")) {
         alert("Invalid file type");
         return;
@@ -90,33 +93,22 @@ form.addEventListener("submit", async function(e) {
     const formData = new FormData();
     formData.append("audio", file);
 
-    // UI reset
     loading.classList.remove("hidden");
     resultDiv.classList.add("hidden");
 
     try {
-        const response = await fetch("/predict", {
+        const response = await fetch("http://127.0.0.1:5000/predict", {
             method: "POST",
             body: formData
         });
 
-        if (!response.ok) {
-            throw new Error("Server error");
+        // 🔥 SAFE JSON handling
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || "Server error");
         }
 
-        const text = await response.text();
-
-        if (!text) {
-            throw new Error("Empty response from server");
-        }
-
-        const data = JSON.parse(text);
-
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        // Show result
         loading.classList.add("hidden");
         resultDiv.classList.remove("hidden");
 
@@ -128,15 +120,21 @@ form.addEventListener("submit", async function(e) {
         document.getElementById("confidenceScore").innerText =
             (data.confidence * 100).toFixed(2) + "%";
 
+        // 🔥 Fake Type show (only if Fake)
+        const fakeTypeText = document.getElementById("fakeTypeText");
+        if (!isReal && data.fake_type) {
+            fakeTypeText.innerText = "Type: " + data.fake_type;
+        } else {
+            fakeTypeText.innerText = "";
+        }
+
         const bar = document.getElementById("confidenceBar");
         bar.style.width = (data.confidence * 100) + "%";
 
         if (isReal) {
-            bar.classList.remove("bg-red-500");
-            bar.classList.add("bg-green-500");
+            bar.className = "h-2 rounded bg-green-500";
         } else {
-            bar.classList.remove("bg-green-500");
-            bar.classList.add("bg-red-500");
+            bar.className = "h-2 rounded bg-red-500";
         }
 
     } catch (err) {

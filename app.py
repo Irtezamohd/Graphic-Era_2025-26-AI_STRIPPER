@@ -109,7 +109,7 @@ def preprocess_audio(audio_path, max_length):
         audio, sr = librosa.load(audio_path, sr=16000)
 
         # 13 MFCC ONLY
-        mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13).T
+        mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13,n_fft=512).T
 
         padded = pad_sequences(
             [mfcc],
@@ -124,6 +124,36 @@ def preprocess_audio(audio_path, max_length):
     except Exception as e:
         print("❌ Preprocess error:", e)
         return None
+
+#---------------------------------------------------------------------------------
+# ------------------------------------------
+# TTS and VC Feature extract
+# ------------------------------------------
+def extract_advanced_features(audio_path):
+    audio, sr = librosa.load(audio_path, sr=16000)
+
+    pitches, magnitudes = librosa.piptrack(y=audio, sr=sr)
+    
+    if np.any(pitches > 0):
+        pitch = np.mean(pitches[pitches > 0])
+    else:
+        pitch = 0
+
+    energy = np.mean(librosa.feature.rms(y=audio))
+    centroid = np.mean(librosa.feature.spectral_centroid(y=audio, sr=sr))
+
+    return pitch, energy, centroid
+
+
+def classify_fake_type(audio_path):
+    pitch, energy, centroid = extract_advanced_features(audio_path)
+
+    if pitch < 150 and energy < 0.02:
+        return "TTS (Text-To-Speech)"
+    else:
+        return "Voice-To-Voice"
+     #-------------------------------------------------------------------------
+
 
 
 # -------------------------------
@@ -173,14 +203,22 @@ def predict():
 
         result = "Fake" if predicted_class == 1 else "Real"
 
+#lucky tomer
+#------------------------------------------------
+        fake_type= None
+        if result == "Fake":
+          fake_type = classify_fake_type(file_path)
+#----------------------------------------------------
         print("✅ Result:", result, confidence)
+    
 
         # Delete file after use
         os.remove(file_path)
 
         return jsonify({
             'prediction': result,
-            'confidence': round(confidence, 4)
+            'confidence': round(confidence, 4),
+            'fake_type':fake_type
         })
 
     except Exception as e:
@@ -193,3 +231,6 @@ def predict():
 # -------------------------------
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=False)
+
+
+    # Graphic-Era_2025-26-AI_STRIPPER
